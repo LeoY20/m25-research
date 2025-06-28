@@ -45,11 +45,50 @@ az_data <- az_data |> mutate(in.geometry_floor_area = case_when(
                             in.geometry_floor_area < 4000 ~ "3000 - 3999 sq ft",
                             TRUE ~ "4000 or more sq ft"))
 
+#Make categories electric, gas, or other
 az_data <- az_data |> mutate(in.heating_fuel = fct_collapse(in.heating_fuel,
                                                 Other = c("Propane", "Other Fuel", "None", "Fuel Oil"))) |>
                             mutate(in.heating_fuel = case_when(
                                   in.heating_fuel == "Natural Gas" ~ "Gas",
                                   TRUE ~ in.heating_fuel))
+
+#Keep only integers from SEER values and make everything else zero
+az_data <- az_data |> mutate(in.hvac_cooling_efficiency = case_when(
+                            str_detect(in.hvac_cooling_efficiency, "\\d$") ~ str_extract(in.hvac_cooling_efficiency, "\\d$"),
+                            TRUE ~ as.character(0)))
+az_data$in.hvac_cooling_efficiency <- as.numeric(az_data$in.hvac_cooling_efficiency)
+
+
+#converting in.hvac_heating_type_and_fuel to VHOMEHEAT, VHEATEQUIP, VHOMEHEATV1 
+#don't even worry about this
+hvac_argsct <- length(unique(az_data$in.hvac_heating_type_and_fuel)) #length
+hvac_htf_other <- vector(mode = "character", length = hvac_argsct) #to store all variables
+hvac_tftable <- str_detect(unique(az_data$in.hvac_heating_type_and_fuel), "Other Fuel")
+for(i in 1:hvac_argsct) {
+  if(hvac_tftable[i]) {
+    hvac_htf_other[i] = unique(az_data$in.hvac_heating_type_and_fuel)[i]
+  }
+}
+#why does this work? I have no idea
+hvac_htf_other <- hvac_htf_other[hvac_htf_other != ""]
+hvac_htf_other
+hvac_variables <- unique(az_data$in.hvac_heating_type_and_fuel)
+hvac_electric <- hvac_variables[!(hvac_variables %in% c("Electricity MSHP", "Electricity ASHP")) &
+                              str_detect(hvac_variables, "Electricity")]
+hvac_electric <- hvac_electric[hvac_electric != ""]
+hvac_natgas <- hvac_variables[str_detect(hvac_variables, "Natural Gas")]
+hvac_natgas <- hvac_natgas[hvac_natgas != ""]
+hvac_propane <- hvac_variables[str_detect(hvac_variables, "Propane")]
+hvac_propane <- hvac_propane[hvac_propane != ""]
+
+
+az_data <- az_data |> mutate(in.hvac_heating_type_and_fuel = fct_collapse(
+                             in.hvac_heating_type_and_fuel, "Electric Heat Pump" = c("Electricity MSHP", "Electricity ASHP"),
+                             Other = hvac_htf_other,
+                             Electric = hvac_electric,
+                             Gas = hvac_natgas,
+                             Propane = hvac_propane))
+
 
 
 
