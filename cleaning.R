@@ -137,10 +137,64 @@ resstock <- resstock |>
 resstock <- resstock |>
   mutate(VRESTYPE = fct_collapse(VRESTYPE, "Multi-Unit" = c("Apartment", "Condo")))
 
+#making VAIRCOND, VACTYPE, VACUNITS, VROOMAC like in.hvac_cooling_type
+resstock <- resstock |>
+  mutate(VCOOLINGTYPE = case_when(
+          str_detect(VACTYPE, "(?i)gas") ~ "Central AC",
+          VAIRCOND == "Yes" & str_detect(VACTYPE, "(?i)Heat pump") ~ "Ducted Heat Pump",
+          VAIRCOND == "No" & str_detect(VACTYPE, "(?i)Heat pump") ~ "Non-Ducted Heat Pump",
+          VAIRCOND == "No" & VROOMAC >= 1 ~ "Room AC",
+          VAIRCOND == "No" & VROOMAC < 1 ~ "None",
+          str_detect(VACTYPE, "(?i)separate") ~ "Central AC",
+          TRUE ~ "")) #don't know case set to empty string rn
+
+#removing useless columns
+resstock <- resstock |>
+  select(-VAIRCOND, -VACTYPE, -VACUNITS, -VROOMAC)
+
+#regex matching for heating
+resstock <- resstock |> mutate(VHEATTYPEFUEL = case_when(
+  str_detect(VHOMEHEATV1, "(?i)f ?i ?r ?e ?p ?l ?a ?c ?e") ~ "Other",
+  str_detect(VHOMEHEAT, "Other|") & str_detect(VHOMEHEATV1, "(?i)propane") ~ "Propane",
+  str_detect(VHEATEQUIP, "(?i)Gas furnace|Gas pack") ~ "Gas",
+  str_detect(VHEATEQUIP, "(?i)heat pump") ~ "Electric Heat Pump",
+  str_detect(VHEATEQUIP, "(?i)individual") ~ "Electric",
+  TRUE ~ ""
+))
+
+#removing useless columns
+resstock <- resstock |>
+  select(-VHOMEHEATV1, -VHOMEHEAT, -VHEATEQUIP)
 
 
+#lightbulbs
 
 
+#fridges - assuming that I should make this a duplicate and call it vfridges-1
+#do you want me to extract the numbers from here too?
+resstock <- resstock |>
+  mutate("VFRIDGES-1" = case_when(
+            VFRIDGES == "None" | VFRIDGES == "" ~ "Zero",
+            TRUE ~ VFRIDGES))
+
+resstock <- resstock |>
+  select(-VFRIDGES)
+
+#pool indicator - adjusting to be true indicator variable, with assumptions for non-valid data
+az_data <- az_data |>
+  mutate(in.misc_pool = case_when(
+          in.misc_pool == "Yes" ~ 1,
+          TRUE ~ 0
+  ))
+
+resstock <- resstock |>
+  mutate(VPOOL = case_when(
+          VPOOL == "Yes" ~ 1,
+          TRUE ~ 0
+  ))
+
+#need to fix this so that I don't delete variables until the end.
+unique(az_data$in.water_heater_efficiency)
 
 
 
