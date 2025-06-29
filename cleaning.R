@@ -89,6 +89,65 @@ az_data <- az_data |> mutate(in.hvac_heating_type_and_fuel = fct_collapse(
                              Gas = hvac_natgas,
                              Propane = hvac_propane))
 
+#TODO: make ggplot and find which distribution it fits the most, then set probablistic rule based on that
+#distribution.
+#need to find national distribution or at the very least distribution of wealthy in arizona to split into
+#categories
+
+#in.misc_pool same as resstock
+
+az_data <- az_data |> mutate(in.misc_pool = case_when(
+                              in.misc_pool == "Has Pool" ~ "Yes",
+                              TRUE ~ "No"))
+#does not have empty string case
+
+
+#VHOUSEHOLD same as in.occupants
+resstock <- resstock |> mutate(VHOUSEHOLD = case_when(
+                              VHOUSEHOLD >= 10 ~ "10+",
+                              TRUE ~ as.character(VHOUSEHOLD)
+  
+))
+
+#merge together?
+#unique(resstock$VWATERHEAT)
+#unique(resstock$VTANKTYPE)
+
+#merging in.water_heater_efficiency, in.water_heater_fuel into in.water_heater_efficiency_and_fuel
+#want to remove fuel type? seems like redundant variable
+az_data <- az_data |>
+  unite("in.water_heater_efficiency_and_fuel",in.water_heater_efficiency, in.water_heater_fuel, sep = ", ")
+
+#merging levels of factor for above variable
+az_data <- az_data |>
+  mutate(in.water_heater_efficiency_and_fuel = case_when(
+            str_detect(in.water_heater_efficiency_and_fuel, "(?i)Electric Standard|Electric Premium") ~ "Electric Tank",
+            str_detect(in.water_heater_efficiency_and_fuel, "(?i)Electric Heat Pump, 50 gal, 3.45 UEF") ~ "Electric, Heat Pump",
+            str_detect(in.water_heater_efficiency_and_fuel, "(?i)Natural Gas Standard|Natural Gas Premium") ~ "Gas Tank",
+            str_detect(in.water_heater_efficiency_and_fuel, "(?i)Natural Gas Tankless") ~ "Gas Tankless",
+            str_detect(in.water_heater_efficiency_and_fuel, "(?i)Electric Tankless") ~ "Electric Tankless",
+            TRUE ~ "Other Fuel"
+  ))
+
+#creating standardized variable above for resstock too
+resstock <- resstock |>
+  unite("VWATERHEAT_TANKTYPE", VWATERHEAT, VTANKTYPE, sep = " ")
+
+#combining apartment, condo class into multi-unit
+resstock <- resstock |>
+  mutate(VRESTYPE = fct_collapse(VRESTYPE, "Multi-Unit" = c("Apartment", "Condo")))
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
