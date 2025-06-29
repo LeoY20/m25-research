@@ -115,23 +115,17 @@ resstock <- resstock |> mutate(VHOUSEHOLD = case_when(
 
 #merging in.water_heater_efficiency, in.water_heater_fuel into in.water_heater_efficiency_and_fuel
 #want to remove fuel type? seems like redundant variable
-az_data <- az_data |>
-  unite("in.water_heater_efficiency_and_fuel",in.water_heater_efficiency, in.water_heater_fuel, sep = ", ")
 
 #merging levels of factor for above variable
 az_data <- az_data |>
   mutate(in.water_heater_efficiency_and_fuel = case_when(
-            str_detect(in.water_heater_efficiency_and_fuel, "(?i)Electric Standard|Electric Premium") ~ "Electric Tank",
-            str_detect(in.water_heater_efficiency_and_fuel, "(?i)Electric Heat Pump, 50 gal, 3.45 UEF") ~ "Electric, Heat Pump",
-            str_detect(in.water_heater_efficiency_and_fuel, "(?i)Natural Gas Standard|Natural Gas Premium") ~ "Gas Tank",
-            str_detect(in.water_heater_efficiency_and_fuel, "(?i)Natural Gas Tankless") ~ "Gas Tankless",
-            str_detect(in.water_heater_efficiency_and_fuel, "(?i)Electric Tankless") ~ "Electric Tankless",
+            str_detect(in.water_heater_efficiency, "(?i)Electric Standard|Electric Premium") ~ "Electric Tank",
+            str_detect(in.water_heater_efficiency, "(?i)Electric Heat Pump, 50 gal, 3.45 UEF") ~ "Electric, Heat Pump",
+            str_detect(in.water_heater_efficiency, "(?i)Natural Gas Standard|Natural Gas Premium") ~ "Gas Tank",
+            str_detect(in.water_heater_efficiency, "(?i)Natural Gas Tankless") ~ "Gas Tankless",
+            str_detect(in.water_heater_efficiency, "(?i)Electric Tankless") ~ "Electric Tankless",
             TRUE ~ "Other Fuel"
   ))
-
-#creating standardized variable above for resstock too
-resstock <- resstock |>
-  unite("VWATERHEAT_TANKTYPE", VWATERHEAT, VTANKTYPE, sep = " ")
 
 #combining apartment, condo class into multi-unit
 resstock <- resstock |>
@@ -193,13 +187,26 @@ resstock <- resstock |>
           TRUE ~ 0
   ))
 
-#need to fix this so that I don't delete variables until the end.
-unique(az_data$in.water_heater_efficiency)
+#turning landlord, empty string to "Don't know"
+#combine seemingly unnecessary? variables are quite disjoint as far as I know
+#on other set of variables, seems borderline useless to evne have the other variable because 
+#information can be spliced from first variable to a bijective correspondence.
+resstock <- resstock |>
+  mutate(VWATERHEAT = case_when(
+    str_detect(VWATERHEAT, "(?i)landlord") | VWATERHEAT == "" ~ "Don't Know",
+    str_detect(VWATERHEAT, "(?i)(?=.*solar)(?=.*back-up)") ~ "Other",
+    TRUE ~ VWATERHEAT
+  ))
 
+#I assume the data is from 2017 based on the name of the dataset, and the data dictionary
 
+resstock <- resstock |>
+  mutate(VRESDECADE = case_when(
+          is.na(VRESAGE) ~ NA_integer_,
+          TRUE ~ ((2017 - VRESAGE) - ((2017 - VRESAGE) %% 10))
+  ))
 
-
-
+#vresage kept for more precision if needed
 
 
 
