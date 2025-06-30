@@ -208,6 +208,12 @@ resstock <- resstock |>
 
 #vresage kept for more precision if needed
 
+#lighting is just take whichever of the 3 ranges is the largest and assign to the variable in the lighting
+#one in az data
+
+
+#figure out probability distribution relating to other thing, that one might take a while.
+
 
 
 
