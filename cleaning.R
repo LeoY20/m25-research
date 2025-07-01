@@ -234,10 +234,42 @@ for(i in 1:nrow(resstock)) {
   }
 }
 
+unique(resstock$VINCOME)
+unique(az_data$in.income)
 
+resstock |>
+  ggplot(aes(x = VINCOME)) + 
+  geom_bar()
 
+az_data |>
+  ggplot(aes(x = in.income)) + 
+  geom_bar()
 
+#finally fixing the income shit
+az_data <- az_data |>
+  mutate(in.income = case_when(
+    in.income == "Not Available" ~ "",
+    in.income == "<10000" ~ "Less than $15,000",
+    in.income == "10000-14999" ~ "Less than $15,000",
+    in.income == "15000-19999" ~ "$15,000 to $24,999",
+    in.income == "20000-24999" ~ "$15,000 to $24,999",
+    in.income == "25000-29999" ~ "$25,000 to $34,999",
+    in.income == "30000-34999" ~ "$25,000 to $34,999",
+    in.income == "35000-39999" ~ "$35,000 to $49,999",
+    in.income == "40000-44999" ~ "$35,000 to $49,999",
+    in.income == "45000-49999" ~ "$35,000 to $49,999",
+    in.income == "50000-59999" ~ "$50,000 to $74,999",
+    in.income == "60000-69999" ~ "$50,000 to $74,999",
+    in.income == "70000-79999" ~ ifelse(sample(c(0, 1), size = 1) == 1, "$50,000 to $74,999", "$75,000 to $99,999"),
+    in.income == "80000-99999" ~ "$75,000 to $99,999",
+    in.income == "100000-119999" ~ "$100,000 to $149,999",
+    in.income == "120000-139999" ~ "$100,000 to $149,999",
+    in.income == "140000-159999" ~ ifelse(sample(c(0, 1), size = 1) == 1, "$100,000 to $149,999", "$150,000 or more"),
+    TRUE ~ "$150,000 or more"
+  ))
 
+write_csv(az_data, "AZ_data_cleaned.csv")
+write_csv(resstock, "RET_2017_cleaned.csv")
 
 
 
