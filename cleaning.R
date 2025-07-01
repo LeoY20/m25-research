@@ -211,17 +211,28 @@ resstock <- resstock |>
 #lighting is just take whichever of the 3 ranges is the largest and assign to the variable in the lighting
 #one in az data
 
-
-#figure out probability distribution relating to other thing, that one might take a while.
-
-
-
-
-
-
-
-
-
+#strat: index into individual value, see which one is max, then assign index based on that
+#in even of tiebreaker, will default to incandescent
+#NAs will default to 
+lights <- vector(mode = "character", length = nrow(resstock))
+lightnames <- c("Mostly Incandescent", "Mostly CFL", "Mostly LED")
+for(i in 1:nrow(resstock)) {
+  temp <- vector(mode = "numeric", length = 3)
+  vinc_curr <- as.numeric(stringr::str_extract(resstock$VINCANDA[i], "^\\s*\\d+"))
+  vcfl_curr <- as.numeric(stringr::str_extract(resstock$VCFLA[i], "^\\s*\\d+"))
+  vled_curr <- as.numeric(stringr::str_extract(resstock$VLEDA[i], "^\\s*\\d+"))
+  temp[1] <- ifelse(is.na(vinc_curr), 0, vinc_curr)
+  temp[2] <- ifelse(is.na(vcfl_curr), 0, vcfl_curr)
+  temp[3] <- ifelse(is.na(vled_curr), 0, vled_curr)
+  tie_indices <- which(temp == max(temp)) #pulls the indices that match max
+  if (sum(temp) < 9) { #because 9 is the min value
+    lights[i] <- NA
+  } else if(length(tie_indices) > 1) { #tiebreak
+    lights[i] <- lightnames[sample(tie_indices, size = 1)]
+  } else {
+    lights[i] <- lightnames[which.max(temp)]
+  }
+}
 
 
 
