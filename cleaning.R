@@ -234,6 +234,9 @@ for(i in 1:nrow(resstock)) {
   }
 }
 
+resstock <- resstock |>
+  mutate(VLIGHTS = lights)
+
 unique(resstock$VINCOME)
 unique(az_data$in.income)
 
