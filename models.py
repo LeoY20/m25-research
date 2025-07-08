@@ -6,13 +6,14 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-torch.manual_seed(41)
+torch.manual_seed(42)
 
 az_data = pd.read_csv('AZ_data_cleaned.csv', low_memory=False)
 
 # Define Features (X) and Target (y)
 X_df = az_data.drop(az_data.filter(regex='^out\.').columns, axis=1)
 X_df = X_df.drop(columns=['bldg_id'])
+print(X_df.columns)
 y_series = az_data['out.site_energy.total.energy_consumption.kwh']
 
 # One-Hot Encode using dtype=int
@@ -37,7 +38,7 @@ X = X_encoded_df.to_numpy(dtype=np.float32)
 y = y_series.values
 
 # 1. Split the data BEFORE scaling
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=41)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
 # 2. Initialize scalers
 x_scaler = MinMaxScaler()
