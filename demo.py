@@ -65,10 +65,6 @@ criterion = nn.CrossEntropyLoss()
 # also called epochs, we prob want to lower our learning rate
 optimizer = torch.optim.Adam(model.parameters(), lr = 0.01) #model.parameters basically just gets the parameters from object model
 # print(model.parameters)
-#lalalala test
-print("poop\n")
-# what the hell
-#train our model
 #epochs = run thru all of training data in network
 epochs = 100 #loop guard
 losses = [] #empty list of losses
