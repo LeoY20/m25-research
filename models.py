@@ -63,7 +63,7 @@ for i in range(15):
     if p_value < 0.05: # H0 = var1 follows normal distribution
         nta.append((corr_vals[i][0]))
 
-print(nta) # lol every single one is not normal data. fuck.
+# print(nta) # lol every single one is not normal data. fuck.
 # note: need to take care of replacing NA values within the response variable, change that to cooling
 
 
@@ -89,6 +89,14 @@ from sklearn.preprocessing import MinMaxScaler
 # X = X_encoded_df.to_numpy(dtype=np.float32)
 # y = y_series.values
 
+# Check for MPS availability and set the device
+if torch.backends.mps.is_available():
+    device = torch.device("mps")
+    print("Using Apple Silicon GPU (MPS)")
+else:
+    device = torch.device("cpu")
+    print("MPS not available, using CPU")
+
 # # 1. Split the data BEFORE scaling
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
@@ -110,6 +118,12 @@ X_test = torch.FloatTensor(X_test)
 y_train = torch.FloatTensor(y_train).view(-1, 1)
 y_test = torch.FloatTensor(y_test).view(-1, 1)
 
+# moving to macos gpu to free up cpu usage
+X_train = X_train.to(device)
+X_test = X_test.to(device)
+y_train = y_train.to(device)
+y_test = y_test.to(device)
+
 class Model(nn.Module):
     #init defines the properties of the object, we're defining fc1, fc2, out as layers
     def __init__(self, in_features, h1 = 1000, h2 = 2500, h3 = 1000, out_features = 1): #pass in itself, 4 features due to petal width, petal length, etc.
@@ -129,6 +143,7 @@ class Model(nn.Module):
     
 input_size = X_df.shape[1] 
 model = Model(in_features=input_size)
+model.to(device)
 
 #set criterion of model to measure error, how far off predictions are from data
 criterion = nn.MSELoss()
@@ -136,7 +151,7 @@ criterion = nn.MSELoss()
 # also called epochs, we prob want to lower our learning rate
 optimizer = torch.optim.Adam(model.parameters(), lr = 0.005) #model.parameters basically just gets the parameters from object model
 
-epochs = 100 #loop guard
+epochs = 10000 #loop guard
 # losses = [] #empty list of losses
 loss = 0
 for i in range(epochs): #for each epoch want to send shit forward
