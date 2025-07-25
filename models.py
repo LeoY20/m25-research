@@ -73,24 +73,24 @@ print(nta) # lol every single one is not normal data. fuck.
 #     print(f"{X_df_vif.columns[i]} vif: {variance_inflation_factor(X_df_vif.values, i)}")
 
 # # print(list(X_df.columns))
-# y_series = az_data['out.site_energy.total.energy_consumption.kwh']
+y_series = az_data['out.electricity.cooling.energy_consumption.kwh']
 
 # # # Fill any resulting NaNs
 # # # New, more robust line
 # # X_encoded_df = X_encoded_df.fillna(0)
 
-# # # Convert to NumPy arrays
-# X = X_df.to_numpy(dtype=np.float32)
+# # Convert to NumPy arrays
+X = X_df.to_numpy(dtype=np.float32)
+y = y_series.values
+
+from sklearn.preprocessing import MinMaxScaler
+
+# # ... after you create X and y NumPy arrays ...
+# X = X_encoded_df.to_numpy(dtype=np.float32)
 # y = y_series.values
 
-# from sklearn.preprocessing import MinMaxScaler
-
-# # # ... after you create X and y NumPy arrays ...
-# # X = X_encoded_df.to_numpy(dtype=np.float32)
-# # y = y_series.values
-
-# # # 1. Split the data BEFORE scaling
-# X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+# # 1. Split the data BEFORE scaling
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
 # # 2. Initialize scalers
 # x_scaler = MinMaxScaler()
@@ -104,48 +104,48 @@ print(nta) # lol every single one is not normal data. fuck.
 # X_test_scaled = x_scaler.transform(X_test)
 # y_test_scaled = y_scaler.transform(y_test.reshape(-1, 1))
 
-# # # 5. Convert the SCALED data to PyTorch Tensors
-# X_train = torch.FloatTensor(X_train_scaled)
-# X_test = torch.FloatTensor(X_test_scaled)
-# y_train = torch.FloatTensor(y_train_scaled)
-# y_test = torch.FloatTensor(y_test_scaled)
+# # 5. Convert the SCALED data to PyTorch Tensors
+X_train = torch.FloatTensor(X_train)
+X_test = torch.FloatTensor(X_test)
+y_train = torch.FloatTensor(y_train).view(-1, 1)
+y_test = torch.FloatTensor(y_test).view(-1, 1)
 
-# class Model(nn.Module):
-#     #init defines the properties of the object, we're defining fc1, fc2, out as layers
-#     def __init__(self, in_features, h1 = 15, h2 = 15, h3 = 15, out_features = 1): #pass in itself, 4 features due to petal width, petal length, etc.
-#         super().__init__() #instantiate our nn.module, always have to do it
-#         self.fc1 = nn.Linear(in_features, h1) #fc1 is fully connected neural networks, linear model
-#         self.fc2 = nn.Linear(h1, h2) #basically you are moving forward
-#         self.fc3 = nn.Linear(h2, h3)
-#         self.out = nn.Linear(h3, out_features)
+class Model(nn.Module):
+    #init defines the properties of the object, we're defining fc1, fc2, out as layers
+    def __init__(self, in_features, h1 = 1000, h2 = 2500, h3 = 1000, out_features = 1): #pass in itself, 4 features due to petal width, petal length, etc.
+        super().__init__() #instantiate our nn.module, always have to do it
+        self.fc1 = nn.Linear(in_features, h1) #fc1 is fully connected neural networks, linear model
+        self.fc2 = nn.Linear(h1, h2) #basically you are moving forward
+        self.fc3 = nn.Linear(h2, h3)
+        self.out = nn.Linear(h3, out_features)
     
-#     def forward(self, x): #relu = rectified linear unit
-#         #do something, if output < 0, we call 0, otherwise use the output
-#         x = F.relu(self.fc1(x)) #basically coding to move it thru it
-#         x = F.relu(self.fc2(x)) #basically you reassign every single time
-#         x = F.relu(self.fc3(x))
-#         x = self.out(x)
-#         return x
+    def forward(self, x): #relu = rectified linear unit
+        #do something, if output < 0, we call 0, otherwise use the output
+        x = F.relu(self.fc1(x)) #basically coding to move it thru it
+        x = F.relu(self.fc2(x)) #basically you reassign every single time
+        x = F.relu(self.fc3(x))
+        x = self.out(x)
+        return x
     
-# input_size = X_df.shape[1] 
-# model = Model(in_features=input_size)
+input_size = X_df.shape[1] 
+model = Model(in_features=input_size)
 
-# #set criterion of model to measure error, how far off predictions are from data
-# criterion = nn.MSELoss()
-# # choose adam optimizer (other ones exist), lr = learning rate (if error doesn't go down as we learn)
-# # also called epochs, we prob want to lower our learning rate
-# optimizer = torch.optim.Adam(model.parameters(), lr = 0.0001) #model.parameters basically just gets the parameters from object model
+#set criterion of model to measure error, how far off predictions are from data
+criterion = nn.MSELoss()
+# choose adam optimizer (other ones exist), lr = learning rate (if error doesn't go down as we learn)
+# also called epochs, we prob want to lower our learning rate
+optimizer = torch.optim.Adam(model.parameters(), lr = 0.005) #model.parameters basically just gets the parameters from object model
 
-# epochs = 10000 #loop guard
-# # losses = [] #empty list of losses
-# loss = 0
-# for i in range(epochs): #for each epoch want to send shit forward
-#     # Go forward and get prediction
-#     y_pred = model.forward(X_train) #sending training data forward
-#     # get predicted results
-#     loss = criterion(y_pred, y_train)
-#     optimizer.zero_grad() # gradient descent
-#     loss.backward() #back propogation
-#     optimizer.step() #step thru
+epochs = 100 #loop guard
+# losses = [] #empty list of losses
+loss = 0
+for i in range(epochs): #for each epoch want to send shit forward
+    # Go forward and get prediction
+    y_pred = model.forward(X_train) #sending training data forward
+    # get predicted results
+    loss = criterion(y_pred, y_train)
+    optimizer.zero_grad() # gradient descent
+    loss.backward() #back propogation
+    optimizer.step() #step thru
 
-# print(f'Final Loss: {loss}')
+print(f'Final Loss: {loss}')
