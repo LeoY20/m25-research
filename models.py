@@ -207,38 +207,40 @@ y_test = y_test.to(device)
 
 class Model(nn.Module):
     #init defines the properties of the object, we're defining fc1, fc2, out as layers
-    def __init__(self, in_features, h1 = 4096, h2 = 2048, h3 = 1024, h4 = 512, h5 = 256, h6 = 128, h7 = 64, out_features = 1): #pass in itself, 4 features due to petal width, petal length, etc.
+    # , h5 = 256, h6 = 128, h7 = 64
+    def __init__(self, in_features, h1 = 2535, h2 = 1089, h3 = 2496, h4 = 1598, out_features = 1, p = 0.5): #pass in itself, 4 features due to petal width, petal length, etc.
         super().__init__() #instantiate our nn.module, always have to do it
         self.fc1 = nn.Linear(in_features, h1) #fc1 is fully connected neural networks, linear model
         self.fc2 = nn.Linear(h1, h2) #basically you are moving forward
         self.fc3 = nn.Linear(h2, h3)
         self.fc4 = nn.Linear(h3, h4)
-        self.fc5 = nn.Linear(h4, h5)
-        self.fc6 = nn.Linear(h5, h6)
-        self.fc7 = nn.Linear(h6, h7)
-        self.out = nn.Linear(h7, out_features)
+        # self.fc5 = nn.Linear(h4, h5)
+        # self.fc6 = nn.Linear(h5, h6)
+        # self.fc7 = nn.Linear(h6, h7)
+        self.out = nn.Linear(h4, out_features)
+        self.dropout = nn.Dropout(p=p)
     
     def forward(self, x): #relu = rectified linear unit
         #do something, if output < 0, we call 0, otherwise use the output
-        x = F.relu(self.fc1(x)) #basically coding to move it thru it
-        x = F.relu(self.fc2(x)) #basically you reassign every single time
-        x = F.relu(self.fc3(x))
-        x = F.relu(self.fc4(x))
-        x = F.relu(self.fc5(x))
-        x = F.relu(self.fc6(x))
-        x = F.relu(self.fc7(x))
+        x = self.dropout(F.relu(self.fc1(x))) #basically coding to move it thru it
+        x = self.dropout(F.relu(self.fc2(x))) #basically you reassign every single time
+        x = self.dropout(F.relu(self.fc3(x)))
+        x = self.dropout(F.relu(self.fc4(x)))
+        # x = self.dropout(F.relu(self.fc5(x)))
+        # x = self.dropout(F.relu(self.fc6(x)))
+        # x = self.dropout(F.relu(self.fc7(x)))
         x = self.out(x)
         return x
     
 input_size = X_df.shape[1] 
-model = Model(in_features=input_size)
+model = Model(in_features=input_size, p = 0.3118416838334232)
 model.to(device)
 
 #set criterion of model to measure error, how far off predictions are from data
 criterion = nn.MSELoss()
 # choose adam optimizer (other ones exist), lr = learning rate (if error doesn't go down as we learn)
 # also called epochs, we prob want to lower our learning rate
-optimizer = torch.optim.Adam(model.parameters(), lr = 0.001) #model.parameters basically just gets the parameters from object model
+optimizer = torch.optim.Adam(model.parameters(), lr = 0.0006275505560785407) #model.parameters basically just gets the parameters from object model
 # variable learning rate in model
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 
                                                        mode='min', 
