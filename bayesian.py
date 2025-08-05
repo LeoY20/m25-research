@@ -43,13 +43,13 @@ geom_flarea_ordinal_encoder = OrdinalEncoder(categories=[geom_floorarea_ord])
 X_df['in.geometry_floor_area'] = geom_flarea_ordinal_encoder.fit_transform(X_df[['in.geometry_floor_area']])
 
 # in.duct_leakage_and_insulation - ordinal
-duct_ord = ['0','30% Leakage to Outside, Uninsulated','30% Leakage to Outside, R-4',
+duct_ord = ['30% Leakage to Outside, Uninsulated','30% Leakage to Outside, R-4',
                 '30% Leakage to Outside, R-6','30% Leakage to Outside, R-8',
                 '20% Leakage to Outside, Uninsulated','20% Leakage to Outside, R-4',
                 '20% Leakage to Outside, R-6','20% Leakage to Outside, R-8',
                 '10% Leakage to Outside, Uninsulated','10% Leakage to Outside, R-4',
                 '10% Leakage to Outside, R-6','10% Leakage to Outside, R-8',
-                '0% Leakage to Outside, Uninsulated']
+                '0% Leakage to Outside, Uninsulated', '0']
 duct_ord_encoder = OrdinalEncoder(categories=[duct_ord])
 X_df['in.duct_leakage_and_insulation'] = X_df['in.duct_leakage_and_insulation'].fillna('0') # temp
 X_df['in.duct_leakage_and_insulation'] = duct_ord_encoder.fit_transform(X_df[['in.duct_leakage_and_insulation']])
@@ -61,6 +61,42 @@ geom_floor_area_bin_ord = ['0-1499', '1500-2499', '2500-3999', '4000+']
 geom_flarea_bin_ordinal_encoder = OrdinalEncoder(categories=[geom_floor_area_bin_ord])
 X_df['in.geometry_floor_area_bin'] = geom_flarea_bin_ordinal_encoder.fit_transform(X_df[['in.geometry_floor_area_bin']])
 
+geom_btype_height_ord = ['Mobile Home', 
+                         'Single-Family Detached', 
+                         'Single-Family Attached',
+                         'Multifamily with 2-4 Units',
+                         'Multifamily with 5+ units, 1-3 stories',
+                         'Multifamily with 5+ units, 4-7 stories',
+                         'Multifamily with 5+ units, 8+ stories'
+                         ]
+geom_bth_ordinal_encoder = OrdinalEncoder(categories=[geom_btype_height_ord])
+X_df['in.geometry_building_type_height'] = geom_bth_ordinal_encoder.fit_transform(X_df[['in.geometry_building_type_height']])
+
+in_plug_ord = ['78%', '84%', '103%', '106%', '166%']
+in_plug_ord_encoder = OrdinalEncoder(categories=[in_plug_ord])
+X_df['in.plug_loads'] = in_plug_ord_encoder.fit_transform(X_df[['in.plug_loads']])
+
+blevel_ord = ['Bottom', 'Middle', 'Top', '0']
+blevel_ord_encoder = OrdinalEncoder(categories=[blevel_ord])
+X_df['in.geometry_building_level_mf'] = X_df['in.geometry_building_level_mf'].fillna('0') #temp fill NA with 0
+X_df['in.geometry_building_level_mf'] = blevel_ord_encoder.fit_transform(X_df[['in.geometry_building_level_mf']])
+X_df['in.geometry_building_level_mf'] = X_df['in.geometry_building_level_mf'].replace('0', np.nan)
+
+ashr_2004_ord = ['2B', '3B', '4B', '5B']
+ashr_2004_ord_encoder = OrdinalEncoder(categories = [ashr_2004_ord])
+X_df['in.ashrae_iecc_climate_zone_2004'] = ashr_2004_ord_encoder.fit_transform(X_df[['in.ashrae_iecc_climate_zone_2004']])
+
+X_df = X_df[X_df['in.neighbors'] != 'Left/Right at 15ft'] # don't know what this means
+neighbors_ord = ['2', '4', '7', '12', '27', '0']
+neighbors_ord_encoder = OrdinalEncoder(categories = [neighbors_ord])
+X_df['in.neighbors'] = X_df['in.neighbors'].fillna('0') #temp fill NA with 0
+X_df['in.neighbors'] = neighbors_ord_encoder.fit_transform(X_df[['in.neighbors']])
+X_df['in.neighbors'] = X_df['in.neighbors'].replace('0', np.nan)
+
+
+
+
+
 # factorizing categorical cols - literally anything not a number.
 categorical_cols = X_df.select_dtypes(exclude='number').columns
 for col in categorical_cols:
@@ -70,17 +106,17 @@ for col in categorical_cols:
 imputer = KNNImputer(n_neighbors = 2)
 X_df = pd.DataFrame(imputer.fit_transform(X_df), columns=X_df.columns)
 
-corr_vals = []
-for col in X_df.columns:
-    corr, p_val = pearsonr(X_df[col].to_numpy(), az_data['out.electricity.cooling.energy_consumption.kwh'])
-    if p_val < 0.05:
-        corr_vals.append((col, round(abs(corr), 2)))
+# corr_vals = []
+# for col in X_df.columns:
+#     corr, p_val = pearsonr(X_df[col].to_numpy(), az_data['out.electricity.cooling.energy_consumption.kwh'])
+#     if p_val < 0.05:
+#         corr_vals.append((col, round(abs(corr), 2)))
 
-# sorting by correlation coefficient
-corr_vals.sort(key=lambda item: item[1], reverse=True)
+# # sorting by correlation coefficient
+# corr_vals.sort(key=lambda item: item[1], reverse=True)
 
-for val in corr_vals:
-    print(val)
+# for val in corr_vals:
+#     print(val)
 
 # note: need to take care of replacing NA values within the response variable, change that to cooling
 X_df['in.sqft'] = np.log(X_df['in.sqft'] + 1) #transforming right skew
@@ -97,7 +133,20 @@ X_df['in.heating_setpoint'] = (X_df['in.heating_setpoint'] - X_df['in.heating_se
 X_df['in.occupants'] = np.sqrt(X_df['in.occupants']) #transforming left skew
 X_df['in.occupants'] = (X_df['in.occupants'] - X_df['in.occupants'].mean()) / X_df['in.occupants'].std()
 
-cols_keep = ['in.has_pv','in.insulation_ceiling', 'in.sqft', 'in.bedrooms', 'in.representative_income', 'in.duct_leakage_and_insulation', 'in.misc_pool', 'in.dishwasher', 'in.roof_material', 'in.heating_setpoint', 'in.misc_pool_heater', 'in.occupants', 'in.geometry_floor_area', 'in.has_pv', 'in.misc_hot_tub_spa']
+
+
+
+
+
+cols_keep = ['in.sqft', 'in.geometry_floor_area_bin',
+             'in.bedrooms', 'in.geometry_building_type_height',
+             'in.corridor', 'in.plug_loads',
+             'in.ahs_region', 'in.geometry_building_level_mf',
+             'in.weather_file_city', 'in.representative_income',
+             'in.ashrae_iecc_climate_zone_2004', 'in.energystar_climate_zone_2023',
+             'in.neighbors', 'in.geometry_building_horizontal_location_mf',
+             'in.water_heater_location', 'in.county_name'
+             'in.hvac_has_ducts', 'in.building_america_climate_zone']
 X_df = X_df[cols_keep]
 
 
@@ -124,14 +173,3 @@ if torch.backends.mps.is_available():
 else:
     device = torch.device("cpu")
     print("MPS not available, using CPU")
-
-# new variables to use after I uh...found out that I forgot to absolute value the magnitude.
-# in.sqft (0.56), in.geometry_floor_area_bin (0.56),  in.bedrooms(0.48), in.geometry_building_type_height (0.43)
-# in.corridor (0.39), in.geometry_building_type_acs (0.39), in.geometry_building_type_recs (0.39), in.plug_loads (0.39)
-# in.ahs_region (0.36), in.geometry_building_level_mf (0.36), in.weather_file_city (0.36), in.representative_income (0.35)
-# in.ashrae_iecc_climate_zone_2004 (0.35), in.ashrae_iecc_climate_zone_2004_2_a_split (0.35), 
-# in.energystar_climate_zone_2023 (0.35), in.neighbors (0.35), in.geometry_building_horizontal_location_mf (0.33)
-# in.water_heater_location (0.33), in.county (0.32), in.county_name (0.32), in.hvac_has_ducts (0.32), 
-# in.building_america_climate_zone (0.3)
-
-# need to scale these
