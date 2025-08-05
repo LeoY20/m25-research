@@ -140,9 +140,9 @@ cols_keep = ['in.sqft', 'in.geometry_floor_area_bin',
              'in.ashrae_iecc_climate_zone_2004', 'in.energystar_climate_zone_2023',
              'in.neighbors', 'in.geometry_building_horizontal_location_mf',
              'in.water_heater_location', 'in.county_name',
-             'in.hvac_has_ducts', 'in.building_america_climate_zone']
+             'in.hvac_has_ducts']
 X_df = X_df[cols_keep]
-
+# , 'in.building_america_climate_zone' 'in.county_name', have
 
 # # X_df_vif = add_constant(X_df) # updates with constnat to use for VIF, only using for this case
 # # for i in range(1, len(X_df_vif.columns)):
@@ -160,9 +160,9 @@ y = y_series.values
 
 from sklearn.preprocessing import MinMaxScaler
 
-# # X_df_vif = add_constant(X_df) # updates with constnat to use for VIF, only using for this case
-# # for i in range(1, len(X_df_vif.columns)):
-# #     print(f"{X_df_vif.columns[i]} vif: {variance_inflation_factor(X_df_vif.values, i)}")
+X_df_vif = add_constant(X_df) # updates with constnat to use for VIF, only using for this case
+for i in range(1, len(X_df_vif.columns)):
+    print(f"{X_df_vif.columns[i]} vif: {variance_inflation_factor(X_df_vif.values, i)}")
 
 # # # # print(list(X_df.columns))
 y_series = az_data['out.electricity.cooling.energy_consumption.kwh']
