@@ -17,12 +17,26 @@ from scipy.stats import pearsonr
 from scipy.stats import kstest
 from sklearn.preprocessing import QuantileTransformer
 from sklearn.preprocessing import OrdinalEncoder
+from sklearn.preprocessing import MinMaxScaler
+from lightgbm import LGBMRegressor
+from sklearn.feature_selection import SelectFromModel
 
 torch.manual_seed(42)
 
 az_data = pd.read_csv('AZ_data_cleaned.csv', low_memory=False)
 az_data = az_data[az_data['out.electricity.cooling.energy_consumption.kwh'] != 'NA']
-az_data = az_data[az_data['in.neighbors'] != 'Left/Right at 15ft'] # don't know what this means
+# Example: Capping a feature at the 1st and 99th percentiles
+feature = 'out.electricity.cooling.energy_consumption.kwh'
+bound_75 = az_data[feature].quantile(0.75)
+bound_25 = az_data[feature].quantile(0.25)
+iqr = bound_75 - bound_25
+lower_bound = bound_25 - (1.5*iqr)
+upper_bound = bound_75 + (1.5*iqr)
+az_data[feature] = az_data[feature].clip(lower_bound, upper_bound)
+
+max = az_data[feature].max()
+min = az_data[feature].min()
+print(f"max: {max}; min: {min}")
 
 # data cleaning - drop vars
 X_df = az_data.drop(az_data.filter(regex='^out.').columns, axis=1)
@@ -55,6 +69,17 @@ duct_ord = ['30% Leakage to Outside, Uninsulated','30% Leakage to Outside, R-4',
 duct_ord_encoder = OrdinalEncoder(categories=[duct_ord], handle_unknown='use_encoded_value', unknown_value=np.nan)
 X_df['in.duct_leakage_and_insulation'] = duct_ord_encoder.fit_transform(X_df[['in.duct_leakage_and_insulation']])
 
+# bar plot for poster
+# X_df['in.geometry_floor_area_bin'].value_counts().plot.bar(
+#     title='Bar Plot of Residence Size',
+#     xlabel='House Size (ft²)',
+#     ylabel='Count',
+#     color = [[0.8, 0.4, 0.4], [0.8, 0.7, 0.4], [0.5, 0.6, 0.4], [0.4, 0.6, 0.8]],
+#     rot=0 # Prevents x-axis labels from rotating
+# )
+# plt.show()
+
+
 # in.geometry_floor_area_bin - ordinal - vif???
 geom_floor_area_bin_ord = ['0-1499', '1500-2499', '2500-3999', '4000+']
 geom_flarea_bin_ordinal_encoder = OrdinalEncoder(categories=[geom_floor_area_bin_ord])
@@ -83,10 +108,9 @@ ashr_2004_ord = ['2B', '3B', '4B', '5B']
 ashr_2004_ord_encoder = OrdinalEncoder(categories = [ashr_2004_ord])
 X_df['in.ashrae_iecc_climate_zone_2004'] = ashr_2004_ord_encoder.fit_transform(X_df[['in.ashrae_iecc_climate_zone_2004']])
 
-neighbors_ord = ['2', '4', '7', '12', '27']
+neighbors_ord = ['2', '4', '7', '12', 'Left/Right at 15ft', '27']
 neighbors_ord_encoder = OrdinalEncoder(categories = [neighbors_ord], handle_unknown='use_encoded_value', unknown_value=np.nan)
 X_df['in.neighbors'] = neighbors_ord_encoder.fit_transform(X_df[['in.neighbors']])
-
 
 
 
@@ -97,7 +121,7 @@ for col in categorical_cols:
     X_df[col] = pd.factorize(X_df[col], use_na_sentinel = False)[0] + 1 
 
 # KNN-impute values - knn imputer with 10 nearest values
-imputer = KNNImputer(n_neighbors = 10)
+imputer = KNNImputer(n_neighbors = 8)
 X_df = pd.DataFrame(imputer.fit_transform(X_df), columns=X_df.columns)
 
 # corr_vals = []
@@ -112,13 +136,13 @@ X_df = pd.DataFrame(imputer.fit_transform(X_df), columns=X_df.columns)
 # for val in corr_vals:
 #     print(val)
 
-# note: need to take care of replacing NA values within the response variable, change that to cooling
+# # note: need to take care of replacing NA values within the response variable, change that to cooling
 X_df['in.sqft'] = np.log(X_df['in.sqft'] + 1) #transforming right skew
 X_df['in.sqft'] = (X_df['in.sqft'] - X_df['in.sqft'].mean()) / X_df['in.sqft'].std()
 
 X_df['in.bedrooms'] = (X_df['in.bedrooms'] - X_df['in.bedrooms'].mean()) / X_df['in.bedrooms'].std() # scaling to z-distribution
 
-X_df['in.representative_income'] = np.sqrt(X_df['in.representative_income']) #transforming right skew
+X_df['in.representative_income'] = np.log(X_df['in.representative_income'] + 1) #transforming right skew
 X_df['in.representative_income'] = (X_df['in.representative_income'] - X_df['in.representative_income'].mean()) / X_df['in.representative_income'].std() # scaling to z-distribution
 
 X_df['in.heating_setpoint'] = (X_df['in.heating_setpoint']) ** 2 #transforming left skew
@@ -127,21 +151,27 @@ X_df['in.heating_setpoint'] = (X_df['in.heating_setpoint'] - X_df['in.heating_se
 X_df['in.occupants'] = np.sqrt(X_df['in.occupants']) #transforming left skew
 X_df['in.occupants'] = (X_df['in.occupants'] - X_df['in.occupants'].mean()) / X_df['in.occupants'].std()
 
+# feature engineering
+X_df['in.sqrt_squared'] = X_df['in.sqft'] ** 2
+X_df['in.bedrooms_squared'] = X_df['in.bedrooms'] ** 2
+X_df['in.representative_income_sq'] = X_df['in.representative_income'] ** 2
+X_df['in.heating_setpoint_sq'] = X_df['in.heating_setpoint'] ** 2
+X_df['in.occupants_sq'] =  X_df['in.occupants'] ** 2
 
 
 
 
 
-cols_keep = ['in.sqft', 'in.geometry_floor_area_bin',
-             'in.bedrooms', 'in.geometry_building_type_height',
-             'in.corridor', 'in.plug_loads',
-             'in.ahs_region', 'in.geometry_building_level_mf',
-             'in.weather_file_city', 'in.representative_income',
-             'in.ashrae_iecc_climate_zone_2004', 'in.energystar_climate_zone_2023',
-             'in.neighbors', 'in.geometry_building_horizontal_location_mf',
-             'in.water_heater_location', 'in.county_name',
-             'in.hvac_has_ducts']
-X_df = X_df[cols_keep]
+# cols_keep = ['in.sqft', 'in.geometry_floor_area_bin',
+#              'in.bedrooms', 'in.geometry_building_type_height',
+#              'in.corridor', 'in.plug_loads',
+#              'in.ahs_region', 'in.geometry_building_level_mf',
+#              'in.weather_file_city', 'in.representative_income',
+#              'in.ashrae_iecc_climate_zone_2004', 'in.energystar_climate_zone_2023',
+#              'in.neighbors', 'in.geometry_building_horizontal_location_mf',
+#              'in.water_heater_location', 'in.county_name',
+#              'in.hvac_has_ducts', 'in.sqrt_squared']
+# X_df = X_df[cols_keep]
 # , 'in.building_america_climate_zone' 'in.county_name', have
 
 # # X_df_vif = add_constant(X_df) # updates with constnat to use for VIF, only using for this case
@@ -158,23 +188,8 @@ y_series = np.sqrt(y_series) # don't scale
 X = X_df.to_numpy(dtype=np.float32)
 y = y_series.values
 
-from sklearn.preprocessing import MinMaxScaler
-
-X_df_vif = add_constant(X_df) # updates with constnat to use for VIF, only using for this case
-for i in range(1, len(X_df_vif.columns)):
-    print(f"{X_df_vif.columns[i]} vif: {variance_inflation_factor(X_df_vif.values, i)}")
-
-# # # # print(list(X_df.columns))
-y_series = az_data['out.electricity.cooling.energy_consumption.kwh']
-y_series = np.sqrt(y_series) # don't scale
-# plt.hist(y_series)
-# plt.show()
-
-# # # Convert to NumPy arrays
-X = X_df.to_numpy(dtype=np.float32)
-y = y_series.values
-
-from sklearn.preprocessing import MinMaxScaler
+scaler = MinMaxScaler()
+X = scaler.fit_transform(X)
 
 # Check for MPS availability and set the device
 if torch.backends.mps.is_available():
@@ -186,9 +201,43 @@ else:
 
 # train-test split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+X_test_copy = X_test.copy()
+y_test_copy = y_test.copy()
 
-X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state = 42) 
+X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.1, random_state = 42) 
 
+lgbm = LGBMRegressor(random_state=42)
+lgbm.fit(X_train, y_train)
+selector = SelectFromModel(lgbm, prefit=True, threshold="median")
+
+# # 1. Get the original feature names
+# original_feature_names = X_df.columns.tolist()
+
+# # 2. Get the feature importances from the trained LightGBM model
+# feature_importances = lgbm.feature_importances_
+
+# # 3. Create a pandas Series for easy plotting
+# importance_series = pd.Series(feature_importances, index=original_feature_names)
+
+# # 4. Sort the features by importance in descending order
+# sorted_importances = importance_series.sort_values(ascending=False)
+
+# # 5. Limit the Series to the top 20 features
+# top_10_importances = sorted_importances.head(10)
+
+# # 6. Plot the top 20 feature importances
+# plt.figure(figsize=(10, 8))
+# top_10_importances.plot.barh(color='skyblue')
+# plt.title('Top 10 Selected Features and Importance', fontsize=16)
+# plt.xlabel('Importance', fontsize=14)
+# plt.ylabel('Feature Name', fontsize=14)
+# plt.gca().invert_yaxis()
+# plt.tight_layout()
+# plt.show()
+
+X_train = selector.transform(X_train)
+X_val = selector.transform(X_val)
+X_test = selector.transform(X_test)
 
 X_train = torch.FloatTensor(X_train)
 X_val = torch.FloatTensor(X_val)
@@ -208,7 +257,7 @@ y_test = y_test.to(device)
 class Model(nn.Module):
     #init defines the properties of the object, we're defining fc1, fc2, out as layers
     # , h5 = 256, h6 = 128, h7 = 64
-    def __init__(self, in_features, h1 = 2535, h2 = 1089, h3 = 2496, h4 = 1598, out_features = 1, p = 0.5): #pass in itself, 4 features due to petal width, petal length, etc.
+    def __init__(self, in_features, h1 = 1600, h2 = 800, h3 = 400, h4 = 200, out_features = 1, p = 0.5): #pass in itself, 4 features due to petal width, petal length, etc.
         super().__init__() #instantiate our nn.module, always have to do it
         self.fc1 = nn.Linear(in_features, h1) #fc1 is fully connected neural networks, linear model
         self.fc2 = nn.Linear(h1, h2) #basically you are moving forward
@@ -232,15 +281,15 @@ class Model(nn.Module):
         x = self.out(x)
         return x
     
-input_size = X_df.shape[1] 
-model = Model(in_features=input_size, p = 0.3118416838334232)
+input_size = X_train.shape[1] 
+model = Model(in_features=input_size, p = 0.4)
 model.to(device)
 
 #set criterion of model to measure error, how far off predictions are from data
 criterion = nn.MSELoss()
 # choose adam optimizer (other ones exist), lr = learning rate (if error doesn't go down as we learn)
 # also called epochs, we prob want to lower our learning rate
-optimizer = torch.optim.Adam(model.parameters(), lr = 0.0006275505560785407) #model.parameters basically just gets the parameters from object model
+optimizer = torch.optim.Adam(model.parameters(), lr = 0.001) #model.parameters basically just gets the parameters from object model
 # variable learning rate in model
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 
                                                        mode='min', 
@@ -254,6 +303,8 @@ test_loss = 0
 val_loss = 0
 best_mse = np.inf   # init to infinity
 best_weights = None
+train_losses = [] # for graph
+val_losses = []
 print("------------starting training------------")
 for i in range(epochs): #for each epoch want to send shit forward
     # Go forward and get prediction
@@ -261,6 +312,7 @@ for i in range(epochs): #for each epoch want to send shit forward
     y_pred = model.forward(X_train) #sending training data forward
     # get predicted results
     train_loss = criterion(y_pred, y_train) # because we square rooted it.
+    train_losses.append(train_loss.item())
     optimizer.zero_grad() # gradient descent
     train_loss.backward() #back propogation
     optimizer.step() #step thru
@@ -270,6 +322,7 @@ for i in range(epochs): #for each epoch want to send shit forward
     with torch.no_grad(): # Disable gradient calculation
         y_val_pred = model(X_val)
         val_loss = criterion(y_val_pred, y_val)
+        val_losses.append(val_loss.item())
         if(val_loss < best_mse):
             best_mse = val_loss
             best_weights = copy.deepcopy(model.state_dict())
@@ -278,9 +331,20 @@ for i in range(epochs): #for each epoch want to send shit forward
 
 model.load_state_dict(best_weights) # early stopping restore weights
 
+plt.figure(figsize=(10, 6))
+plt.plot(train_losses, label='Training Loss')
+plt.plot(val_losses, label='Validation Loss')
+plt.title('Training and Validation Loss Over Epochs', fontsize = 20)
+plt.xlabel('Epochs', fontsize = 15)
+plt.ylabel('MSE (kWh^2)', fontsize = 15)
+plt.legend()
+plt.grid(True)
+plt.show()
+
 # getting an output - uncompressing response variable.
 print("------------training complete------------")
 with torch.no_grad():
+    model.eval()
     train_output = model(X_train)
     test_output = model(X_test)
 
@@ -297,3 +361,4 @@ with torch.no_grad():
 
 print(f'In-sample Final Loss: {in_sample_mse}')
 print(f'OOS Final Loss: {oos_mse}')
+print(f'OOS RMSE Final Loss: {oos_mse ** 0.5}')
